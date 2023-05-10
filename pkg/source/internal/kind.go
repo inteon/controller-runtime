@@ -18,11 +18,17 @@ import (
 
 // Kind is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create).
 type Kind struct {
+	// Cache used to watch APIs
+	Cache cache.Cache
+
 	// Type is the type of object to watch.  e.g. &v1.Pod{}
 	Type client.Object
 
-	// Cache used to watch APIs
-	Cache cache.Cache
+	// EventHandler is the handler to call when events are received.
+	EventHandler handler.EventHandler
+
+	// Predicates are the predicates to evaluate whether to handle the event.
+	Predicates []predicate.Predicate
 
 	// started may contain an error if one was encountered during startup. If its closed and does not
 	// contain an error, startup and syncing finished.
@@ -32,13 +38,15 @@ type Kind struct {
 
 // Start is internal and should be called only by the Controller to register an EventHandler with the Informer
 // to enqueue reconcile.Requests.
-func (ks *Kind) Start(ctx context.Context, handler handler.EventHandler, queue workqueue.RateLimitingInterface,
-	prct ...predicate.Predicate) error {
-	if ks.Type == nil {
-		return fmt.Errorf("must create Kind with a non-nil object")
-	}
+func (ks *Kind) Start(ctx context.Context, queue workqueue.RateLimitingInterface) error {
 	if ks.Cache == nil {
-		return fmt.Errorf("must create Kind with a non-nil cache")
+		return fmt.Errorf("must create Kind with a non-nil Cache")
+	}
+	if ks.Type == nil {
+		return fmt.Errorf("must create Kind with a non-nil Type")
+	}
+	if ks.EventHandler == nil {
+		return fmt.Errorf("must create Kind with a non-nil EventHandler")
 	}
 
 	// cache.GetInformer will block until its context is cancelled if the cache was already started and it can not
@@ -79,7 +87,7 @@ func (ks *Kind) Start(ctx context.Context, handler handler.EventHandler, queue w
 			return
 		}
 
-		_, err := i.AddEventHandler(NewEventHandler(ctx, queue, handler, prct).HandlerFuncs())
+		_, err := i.AddEventHandler(NewEventHandler(ctx, queue, ks.EventHandler, ks.Predicates).HandlerFuncs())
 		if err != nil {
 			ks.started <- err
 			return

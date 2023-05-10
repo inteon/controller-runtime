@@ -40,8 +40,7 @@ var c controller.Controller
 func ExampleEnqueueRequestForObject() {
 	// controller is a controller.controller
 	err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Pod{}),
-		&handler.EnqueueRequestForObject{},
+		source.Kind(mgr.GetCache(), &corev1.Pod{}, &handler.EnqueueRequestForObject{}),
 	)
 	if err != nil {
 		// handle it
@@ -52,10 +51,11 @@ func ExampleEnqueueRequestForObject() {
 // owning (direct) Deployment responsible for the creation of the ReplicaSet.
 func ExampleEnqueueRequestForOwner() {
 	// controller is a controller.controller
-	err := c.Watch(
-		source.Kind(mgr.GetCache(), &appsv1.ReplicaSet{}),
+	err := c.Watch(source.Kind(
+		mgr.GetCache(),
+		&appsv1.ReplicaSet{},
 		handler.EnqueueRequestForOwner(mgr.GetScheme(), mgr.GetRESTMapper(), &appsv1.Deployment{}, handler.OnlyControllerOwner()),
-	)
+	))
 	if err != nil {
 		// handle it
 	}
@@ -65,8 +65,9 @@ func ExampleEnqueueRequestForOwner() {
 // objects (of Type: MyKind) using a mapping function defined by the user.
 func ExampleEnqueueRequestsFromMapFunc() {
 	// controller is a controller.controller
-	err := c.Watch(
-		source.Kind(mgr.GetCache(), &appsv1.Deployment{}),
+	err := c.Watch(source.Kind(
+		mgr.GetCache(),
+		&appsv1.Deployment{},
 		handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
@@ -79,7 +80,7 @@ func ExampleEnqueueRequestsFromMapFunc() {
 				}},
 			}
 		}),
-	)
+	))
 	if err != nil {
 		// handle it
 	}
@@ -88,8 +89,9 @@ func ExampleEnqueueRequestsFromMapFunc() {
 // This example implements handler.EnqueueRequestForObject.
 func ExampleFuncs() {
 	// controller is a controller.controller
-	err := c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Pod{}),
+	err := c.Watch(source.Kind(
+		mgr.GetCache(),
+		&corev1.Pod{},
 		handler.Funcs{
 			CreateFunc: func(ctx context.Context, e event.CreateEvent, q workqueue.RateLimitingInterface) {
 				q.Add(reconcile.Request{NamespacedName: types.NamespacedName{
@@ -116,7 +118,7 @@ func ExampleFuncs() {
 				}})
 			},
 		},
-	)
+	))
 	if err != nil {
 		// handle it
 	}

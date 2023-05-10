@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	internal "sigs.k8s.io/controller-runtime/pkg/internal/source"
+	internal "sigs.k8s.io/controller-runtime/pkg/source/internal"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-var _ = Describe("Internal", func() {
+var _ = Describe("internal.EventHandler", func() {
 	var ctx = context.Background()
 	var instance *internal.EventHandler
 	var funcs, setfuncs *handler.Funcs
