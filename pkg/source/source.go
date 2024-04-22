@@ -29,7 +29,6 @@ import (
 	internal "sigs.k8s.io/controller-runtime/pkg/internal/source"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // Source is a source of events (e.g. Create, Update, Delete operations on Kubernetes Objects, Webhook callbacks, etc)
@@ -54,25 +53,53 @@ type SyncingSource interface {
 }
 
 // Kind creates a KindSource with the given cache provider.
-func Kind[T client.Object](cache cache.Cache, object T, handler handler.TypedEventHandler[T], predicates ...predicate.TypedPredicate[T]) SyncingSource {
+func Kind[T client.Object](cache cache.Cache, object T, handler handler.TypedEventHandler[T]) SyncingSource {
 	return &internal.Kind[T]{
-		Type:       object,
-		Cache:      cache,
-		Handler:    handler,
-		Predicates: predicates,
+		Type:    object,
+		Cache:   cache,
+		Handler: handler,
 	}
 }
 
 var _ Source = &channel[string]{}
 
+type channelOptions struct {
+	DestBufferSize int
+}
+
+// ChannelOption is a functional option for configuring a Channel source.
+type ChannelOption func(*channelOptions)
+
+// WithDestBufferSize specifies the buffer size of dest channels.
+func WithDestBufferSize(destBufferSize int) ChannelOption {
+	return func(o *channelOptions) {
+		if destBufferSize <= 0 {
+			return // ignore invalid buffer size
+		}
+
+		o.DestBufferSize = destBufferSize
+	}
+}
+
 // Channel is used to provide a source of events originating outside the cluster
 // (e.g. GitHub Webhook callback).  Channel requires the user to wire the external
 // source (e.g. http handler) to write GenericEvents to the underlying channel.
-func Channel[T any](source <-chan event.TypedGenericEvent[T], handler handler.TypedEventHandler[T], predicates ...predicate.TypedPredicate[T]) Source {
+func Channel[T any](source <-chan event.TypedGenericEvent[T], handler handler.TypedEventHandler[T], options ...ChannelOption) Source {
+	opts := channelOptions{
+		// 1024 is the default number of event notifications that can be buffered.
+		DestBufferSize: 1024,
+	}
+	for _, o := range options {
+		if o == nil {
+			continue // ignore nil options
+		}
+		o(&opts)
+	}
+
 	return &channel[T]{
-		source:     source,
-		handler:    handler,
-		predicates: predicates,
+		options: opts,
+		source:  source,
+		handler: handler,
 	}
 }
 
@@ -85,7 +112,7 @@ type channel[T any] struct {
 
 	handler handler.TypedEventHandler[T]
 
-	predicates []predicate.TypedPredicate[T]
+	options channelOptions
 
 	// dest is the destination channels of the added event handlers
 	dest []chan event.TypedGenericEvent[T]
@@ -111,7 +138,7 @@ func (cs *channel[T]) Start(
 		return errors.New("must specify Channel.Handler")
 	}
 
-	dst := make(chan event.TypedGenericEvent[T], 1024)
+	dst := make(chan event.TypedGenericEvent[T], cs.options.DestBufferSize)
 
 	cs.destLock.Lock()
 	cs.dest = append(cs.dest, dst)
@@ -124,21 +151,11 @@ func (cs *channel[T]) Start(
 
 	go func() {
 		for evt := range dst {
-			shouldHandle := true
-			for _, p := range cs.predicates {
-				if !p.Generic(evt) {
-					shouldHandle = false
-					break
-				}
-			}
-
-			if shouldHandle {
-				func() {
-					ctx, cancel := context.WithCancel(ctx)
-					defer cancel()
-					cs.handler.Generic(ctx, evt, queue)
-				}()
-			}
+			func() {
+				ctx, cancel := context.WithCancel(ctx)
+				defer cancel()
+				cs.handler.Generic(ctx, evt, queue)
+			}()
 		}
 	}()
 
@@ -187,19 +204,23 @@ func (cs *channel[T]) syncLoop(ctx context.Context) {
 	}
 }
 
-// Informer is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create).
-type Informer struct {
+// informer is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create).
+type informer struct {
 	// Informer is the controller-runtime Informer
-	Informer   cache.Informer
-	Handler    handler.EventHandler
-	Predicates []predicate.Predicate
+	Informer cache.Informer
+	Handler  handler.EventHandler
 }
 
-var _ Source = &Informer{}
+var _ Source = &informer{}
+
+// Informer creates an InformerSource with the given cache provider.
+func Informer(inf cache.Informer, eventhandler handler.EventHandler) Source {
+	return &informer{Informer: inf, Handler: eventhandler}
+}
 
 // Start is internal and should be called only by the Controller to register an EventHandler with the Informer
 // to enqueue reconcile.Requests.
-func (is *Informer) Start(ctx context.Context, queue workqueue.RateLimitingInterface) error {
+func (is *informer) Start(ctx context.Context, queue workqueue.RateLimitingInterface) error {
 	// Informer should have been specified by the user.
 	if is.Informer == nil {
 		return fmt.Errorf("must specify Informer.Informer")
@@ -208,14 +229,14 @@ func (is *Informer) Start(ctx context.Context, queue workqueue.RateLimitingInter
 		return errors.New("must specify Informer.Handler")
 	}
 
-	_, err := is.Informer.AddEventHandler(internal.NewEventHandler(ctx, queue, is.Handler, is.Predicates).HandlerFuncs())
+	_, err := is.Informer.AddEventHandler(internal.NewEventHandler(ctx, queue, is.Handler).HandlerFuncs())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (is *Informer) String() string {
+func (is *informer) String() string {
 	return fmt.Sprintf("informer source: %p", is.Informer)
 }
 

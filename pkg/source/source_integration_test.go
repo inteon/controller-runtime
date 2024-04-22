@@ -238,9 +238,9 @@ var _ = Describe("Source", func() {
 				c := make(chan struct{})
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
-				instance := &source.Informer{
-					Informer: depInformer,
-					Handler: handler.Funcs{
+				instance := source.Informer(
+					depInformer,
+					handler.Funcs{
 						CreateFunc: func(ctx context.Context, evt event.CreateEvent, q2 workqueue.RateLimitingInterface) {
 							defer GinkgoRecover()
 							var err error
@@ -264,7 +264,7 @@ var _ = Describe("Source", func() {
 							Fail("Unexpected GenericEvent")
 						},
 					},
-				}
+				)
 				err := instance.Start(ctx, q)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -282,9 +282,9 @@ var _ = Describe("Source", func() {
 				rs2.SetLabels(map[string]string{"biz": "baz"})
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
-				instance := &source.Informer{
-					Informer: depInformer,
-					Handler: handler.Funcs{
+				instance := source.Informer(
+					depInformer,
+					handler.Funcs{
 						CreateFunc: func(ctx context.Context, evt event.CreateEvent, q2 workqueue.RateLimitingInterface) {
 						},
 						UpdateFunc: func(ctx context.Context, evt event.UpdateEvent, q2 workqueue.RateLimitingInterface) {
@@ -309,7 +309,7 @@ var _ = Describe("Source", func() {
 							Fail("Unexpected GenericEvent")
 						},
 					},
-				}
+				)
 				err = instance.Start(ctx, q)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -322,9 +322,9 @@ var _ = Describe("Source", func() {
 				c := make(chan struct{})
 
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
-				instance := &source.Informer{
-					Informer: depInformer,
-					Handler: handler.Funcs{
+				instance := source.Informer(
+					depInformer,
+					handler.Funcs{
 						CreateFunc: func(context.Context, event.CreateEvent, workqueue.RateLimitingInterface) {
 						},
 						UpdateFunc: func(context.Context, event.UpdateEvent, workqueue.RateLimitingInterface) {
@@ -340,7 +340,7 @@ var _ = Describe("Source", func() {
 							Fail("Unexpected GenericEvent")
 						},
 					},
-				}
+				)
 				err := instance.Start(ctx, q)
 				Expect(err).NotTo(HaveOccurred())
 

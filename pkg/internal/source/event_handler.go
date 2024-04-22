@@ -26,19 +26,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/internal/log"
-
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 var log = logf.RuntimeLog.WithName("source").WithName("EventHandler")
 
 // NewEventHandler creates a new EventHandler.
-func NewEventHandler[T client.Object](ctx context.Context, queue workqueue.RateLimitingInterface, handler handler.TypedEventHandler[T], predicates []predicate.TypedPredicate[T]) *EventHandler[T] {
+func NewEventHandler[T client.Object](ctx context.Context, queue workqueue.RateLimitingInterface, handler handler.TypedEventHandler[T]) *EventHandler[T] {
 	return &EventHandler[T]{
-		ctx:        ctx,
-		handler:    handler,
-		queue:      queue,
-		predicates: predicates,
+		ctx:     ctx,
+		handler: handler,
+		queue:   queue,
 	}
 }
 
@@ -48,9 +45,8 @@ type EventHandler[T client.Object] struct {
 	// that is used to propagate cancellation signals to each handler function.
 	ctx context.Context
 
-	handler    handler.TypedEventHandler[T]
-	queue      workqueue.RateLimitingInterface
-	predicates []predicate.TypedPredicate[T]
+	handler handler.TypedEventHandler[T]
+	queue   workqueue.RateLimitingInterface
 }
 
 // HandlerFuncs converts EventHandler to a ResourceEventHandlerFuncs
@@ -74,12 +70,6 @@ func (e *EventHandler[T]) OnAdd(obj interface{}) {
 		log.Error(nil, "OnAdd missing Object",
 			"object", obj, "type", fmt.Sprintf("%T", obj))
 		return
-	}
-
-	for _, p := range e.predicates {
-		if !p.Create(c) {
-			return
-		}
 	}
 
 	// Invoke create handler
@@ -107,12 +97,6 @@ func (e *EventHandler[T]) OnUpdate(oldObj, newObj interface{}) {
 		log.Error(nil, "OnUpdate missing ObjectNew",
 			"object", newObj, "type", fmt.Sprintf("%T", newObj))
 		return
-	}
-
-	for _, p := range e.predicates {
-		if !p.Update(u) {
-			return
-		}
 	}
 
 	// Invoke update handler
@@ -155,12 +139,6 @@ func (e *EventHandler[T]) OnDelete(obj interface{}) {
 		log.Error(nil, "OnDelete missing Object",
 			"object", obj, "type", fmt.Sprintf("%T", obj))
 		return
-	}
-
-	for _, p := range e.predicates {
-		if !p.Delete(d) {
-			return
-		}
 	}
 
 	// Invoke delete handler

@@ -15,7 +15,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 // Kind is used to provide a source of events originating inside the cluster from Watches (e.g. Pod Create).
@@ -27,8 +26,6 @@ type Kind[T client.Object] struct {
 	Cache cache.Cache
 
 	Handler handler.TypedEventHandler[T]
-
-	Predicates []predicate.TypedPredicate[T]
 
 	// startedErr may contain an error if one was encountered during startup. If its closed and does not
 	// contain an error, startup and syncing finished.
@@ -87,7 +84,7 @@ func (ks *Kind[T]) Start(ctx context.Context, queue workqueue.RateLimitingInterf
 			return
 		}
 
-		_, err := i.AddEventHandler(NewEventHandler(ctx, queue, ks.Handler, ks.Predicates).HandlerFuncs())
+		_, err := i.AddEventHandler(NewEventHandler(ctx, queue, ks.Handler).HandlerFuncs())
 		if err != nil {
 			ks.startedErr <- err
 			return

@@ -296,29 +296,31 @@ var _ = Describe("Source", func() {
 				q := workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test")
 				instance := source.Channel(
 					ch,
-					handler.Funcs{
-						CreateFunc: func(context.Context, event.CreateEvent, workqueue.RateLimitingInterface) {
-							defer GinkgoRecover()
-							Fail("Unexpected CreateEvent")
+					handler.WithPredicates(
+						handler.Funcs{
+							CreateFunc: func(context.Context, event.CreateEvent, workqueue.RateLimitingInterface) {
+								defer GinkgoRecover()
+								Fail("Unexpected CreateEvent")
+							},
+							UpdateFunc: func(context.Context, event.UpdateEvent, workqueue.RateLimitingInterface) {
+								defer GinkgoRecover()
+								Fail("Unexpected UpdateEvent")
+							},
+							DeleteFunc: func(context.Context, event.DeleteEvent, workqueue.RateLimitingInterface) {
+								defer GinkgoRecover()
+								Fail("Unexpected DeleteEvent")
+							},
+							GenericFunc: func(ctx context.Context, evt event.GenericEvent, q2 workqueue.RateLimitingInterface) {
+								defer GinkgoRecover()
+								// The empty event should have been filtered out by the predicates,
+								// and will not be passed to the handler.
+								Expect(q2).To(BeIdenticalTo(q))
+								Expect(evt.Object).To(Equal(p))
+								close(c)
+							},
 						},
-						UpdateFunc: func(context.Context, event.UpdateEvent, workqueue.RateLimitingInterface) {
-							defer GinkgoRecover()
-							Fail("Unexpected UpdateEvent")
-						},
-						DeleteFunc: func(context.Context, event.DeleteEvent, workqueue.RateLimitingInterface) {
-							defer GinkgoRecover()
-							Fail("Unexpected DeleteEvent")
-						},
-						GenericFunc: func(ctx context.Context, evt event.GenericEvent, q2 workqueue.RateLimitingInterface) {
-							defer GinkgoRecover()
-							// The empty event should have been filtered out by the predicates,
-							// and will not be passed to the handler.
-							Expect(q2).To(BeIdenticalTo(q))
-							Expect(evt.Object).To(Equal(p))
-							close(c)
-						},
-					},
-					prct,
+						prct,
+					),
 				)
 				err := instance.Start(ctx, q)
 				Expect(err).NotTo(HaveOccurred())

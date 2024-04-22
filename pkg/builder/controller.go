@@ -282,7 +282,7 @@ func (blder *Builder) doWatch() error {
 		hdler := &handler.EnqueueRequestForObject{}
 		allPredicates := append([]predicate.Predicate(nil), blder.globalPredicates...)
 		allPredicates = append(allPredicates, blder.forInput.predicates...)
-		src := source.Kind(blder.mgr.GetCache(), obj, hdler, allPredicates...)
+		src := source.Kind(blder.mgr.GetCache(), obj, handler.WithPredicates(hdler, allPredicates...))
 		if err := blder.ctrl.Watch(src); err != nil {
 			return err
 		}
@@ -308,7 +308,7 @@ func (blder *Builder) doWatch() error {
 		)
 		allPredicates := append([]predicate.Predicate(nil), blder.globalPredicates...)
 		allPredicates = append(allPredicates, own.predicates...)
-		src := source.Kind(blder.mgr.GetCache(), obj, hdler, allPredicates...)
+		src := source.Kind(blder.mgr.GetCache(), obj, handler.WithPredicates(hdler, allPredicates...))
 		if err := blder.ctrl.Watch(src); err != nil {
 			return err
 		}
@@ -325,7 +325,7 @@ func (blder *Builder) doWatch() error {
 		}
 		allPredicates := append([]predicate.Predicate(nil), blder.globalPredicates...)
 		allPredicates = append(allPredicates, w.predicates...)
-		if err := blder.ctrl.Watch(source.Kind(blder.mgr.GetCache(), projected, w.handler, allPredicates...)); err != nil {
+		if err := blder.ctrl.Watch(source.Kind(blder.mgr.GetCache(), projected, handler.WithPredicates(w.handler, allPredicates...))); err != nil {
 			return err
 		}
 	}
